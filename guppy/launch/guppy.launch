@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="pid" default="false" />
+  <arg name="aruco" default="false" />
+
+  <node pkg="pwm_pca9685" type="pca9685_node" name="pwm" output="screen">
+    <remap from="command" to="pwm"/>
+
+    <param name="device" value="/dev/i2c-1"/>
+    <param name="frequency" value="333"/>
+  </node>
+
+  <node pkg="librobotcontrol" type="librobotcontrol_node" name="imu" output="screen">
+    <param name="use_pwm" value="false"/>
+    <param name="use_adc" value="false"/>
+
+    <param name="use_imu" value="true"/>
+    <param name="i2c_bus" value="1"/>
+    <param name="dmp" value="true"/>
+    <param name="gpio_int_pin_chip" value="0"/>
+    <param name="gpio_int_pin" value="6"/>
+  </node>
+
+  <node pkg="librobotcontrol" type="pressure.py" name="pressure" output="screen" />
+
+  <node pkg="guppy" type="thrusters.py" name="thrusters" output="screen">
+    <remap from="/thrusters/2" to="/thrusters/back_right"/>
+    <remap from="/thrusters/3" to="/thrusters/front_horizontal"/>
+    <remap from="/thrusters/4" to="/thrusters/front_vertical"/>
+    <remap from="/thrusters/5" to="/thrusters/back_left"/>
+    <remap from="/thrusters/6" to="/thrusters/back_horizontal"/>
+    <remap from="/thrusters/7" to="/thrusters/back_vertical"/>
+  </node>
+
+  <node name="thrusters_controller" pkg="thrusters_controllers" type="thrusters_controller_node" output="screen">
+    <rosparam command="load" file="$(find guppy)/config/thrusters.yaml" />
+  </node>
+
+  <node name="observer" pkg="pid_regulator" type="akara_observer.py" output="screen" />
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_link_to_imu_broadcaster"
+        args="0 0 0 1.57 -1.57 0.07 /base_link /imu_link" />
+
+  <group if="$(arg pid)">
+    <node name="pid" pkg="pid_regulator" type="guppy_pid.py" output="screen">
+      <rosparam command="load" file="$(find guppy)/config/pid.yaml" />
+    </node>
+  </group>
+
+  <node pkg="ocam_driver" type="ocam_driver_node" name="camera" output="screen"
+        if="$(arg aruco)">
+    <param name="device"  value="/dev/video1"/>
+    <param name="trigger" value="false"/>
+    <param name="format" value="Motion-JPEG 320 x 240 30 fps"/>
+  </node>
+
+  <node pkg="aruco_detect" type="aruco_detect" name="aruco" output="screen"
+        if="$(arg aruco)">
+    <param name="image_transport" value="compressed"/>
+    <remap from="/camera/compressed" to="/image_raw/compressed" />
+
+    <param name="publish_images" value="false" />
+    <param name="fiducial_len" value="0.1"/>
+    <param name="dictionary" value="3"/>
+    <param name="do_pose_estimation" value="false"/>
+  </node>
+</launch>
