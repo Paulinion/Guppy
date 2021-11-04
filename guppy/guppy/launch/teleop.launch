@@ -1,9 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <arg name="type" default="simple" />
-
-  <node name="joy" pkg="joy" type="joy_node" />
-
-  <node name="teleop" pkg="smtusdb_teleop_tools" type="akara_simple_teleop.py" if="$(eval arg('type') == 'simple')" />
-  <node name="teleop" pkg="smtusdb_teleop_tools" type="guppy_pid_teleop.py" if="$(eval arg('type') == 'pid')" />
-</launch>
