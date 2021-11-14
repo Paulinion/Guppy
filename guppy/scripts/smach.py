@@ -134,7 +134,7 @@ class Controller():
         self.depth_eps_ = EPS_DEPTH
         self.heading_ = 0.0
         self.working_depth_ = WORK_DEPTH
-
+        rospy.Subscriber('joy', Joy, self.joy_callback)
         rospy.Subscriber('depth', Float64, self.depth_callback)
         rospy.Subscriber('heading', Float64, self.heading_callback)
 
