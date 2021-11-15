@@ -9,7 +9,7 @@ from geometry_msgs.msg import Wrench, Twist, Pose
 import smach
 from joy_models import *
 # import smach_ros
-
+import config.msg
 from pid import PID
 from tf.transformations import euler_from_quaternion
 
@@ -93,7 +93,6 @@ class MoveStraight(smach.State):
                 self.cntr.rate.sleep()"""
 
 
-
 class Teleop(smach.State):
     def __init__(self, c):
         smach.State.__init__(self, outcomes=['Switch_to_holding_depth'])
@@ -101,15 +100,16 @@ class Teleop(smach.State):
 
     def execute(self, userdata):
 
-        #self.cntr.teleop() можно сделать перехват телеуправления
+        # self.cntr.teleop() можно сделать перехват телеуправления
         while not rospy.is_shutdown():
-            if joy_msg.buttons[self.joy.BUTTONS.DOWN]:
-                #self.cntr.switch_autopilot(False)
+            if self.config_msg.depth_holding == True:
+                # self.cntr.switch_autopilot(False)
                 self.cntr.switch_depth_pid(False)
-                #self.cntr.switch_pitch_pid(False)
+                # self.cntr.switch_pitch_pid(False)
                 return 'Switch_to_holding_depth'
             else:
                 self.cntr.rate.sleep()
+
 
 class DepthHolding(smach.State):
     def __init__(self, c):
@@ -119,7 +119,7 @@ class DepthHolding(smach.State):
     def execute(self, userdata):
         self.cntr.switch_depth_pid(True)
         while not rospy.is_shutdown():
-            if  joy_msg.buttons[self.joy.BUTTONS.DOWN]:
+            if self.config_msg.depth_holding == False:
                 return 'Switch_to_full_teleop'
             else:
                 self.cntr.rate.sleep()
@@ -127,31 +127,34 @@ class DepthHolding(smach.State):
 
 class Controller():
     def __init__(self):
-        self.joy = DUALSHOCK3()
+
         self.rate = rospy.Rate(10)
         self.heading_eps_ = EPS_HEADING
         self.depth_ = 0.0
         self.depth_eps_ = EPS_DEPTH
         self.heading_ = 0.0
         self.working_depth_ = WORK_DEPTH
-        rospy.Subscriber('joy', Joy, self.joy_callback)
+
         rospy.Subscriber('depth', Float64, self.depth_callback)
         rospy.Subscriber('heading', Float64, self.heading_callback)
-
+        rospy.Subscriber('config', config, self.config)
         rospy.loginfo('waiting sevices')
-        #rospy.wait_for_service('/autopilot/enable')
+        # rospy.wait_for_service('/autopilot/enable')
         rospy.wait_for_service('/autopilot/depth_pid/enable')
-        #rospy.wait_for_service('/autopilot/pitch_pid/enable')
-        #self.autopilot_enable_service = rospy.ServiceProxy('/autopilot/enable', SetBool)
+        # rospy.wait_for_service('/autopilot/pitch_pid/enable')
+        # self.autopilot_enable_service = rospy.ServiceProxy('/autopilot/enable', SetBool)
         self.depth_pid_enable_service = rospy.ServiceProxy('/autopilot/depth_pid/enable', SetBool)
-        #self.pitch_pid_enable_service = rospy.ServiceProxy('/autopilot/pitch_pid/enable', SetBool)
+        # self.pitch_pid_enable_service = rospy.ServiceProxy('/autopilot/pitch_pid/enable', SetBool)
 
-        #self.command_publisher_ = rospy.Publisher('teleop_command', Twist, queue_size=1)
-        #self.pose_publisher_ = rospy.Publisher('pose', Pose, queue_size=1)
-        #self.depth_sp_publisher = rospy.Publisher('depth_pid/setpoint', Float64, queue_size=1)
-        #self.heading_sp_publisher = rospy.Publisher('heading_setpoint', Float64, queue_size=1)
+        # self.command_publisher_ = rospy.Publisher('teleop_command', Twist, queue_size=1)
+        # self.pose_publisher_ = rospy.Publisher('pose', Pose, queue_size=1)
+        # self.depth_sp_publisher = rospy.Publisher('depth_pid/setpoint', Float64, queue_size=1)
+        # self.heading_sp_publisher = rospy.Publisher('heading_setpoint', Float64, queue_size=1)
 
         self.state_change_time = rospy.Time.now()
+
+    def config(self, config):
+        self.config_msg = config
 
     def set_heading(self, heading):
         self.heading_sp_publisher.publish(heading)
@@ -204,22 +207,21 @@ if __name__ == '__main__':
     c = Controller()
     sm = smach.StateMachine(outcomes=['aborted'])
     with sm:
-        #smach.StateMachine.add('SUBMERGE', Submerge(c, WORK_DEPTH),
-                               #transitions={'depth_approached': 'WAIT'})
+        # smach.StateMachine.add('SUBMERGE', Submerge(c, WORK_DEPTH),
+        # transitions={'depth_approached': 'WAIT'})
 
         # smach.StateMachine.add('HEADING1', ApproachHeadingImu(c, STARTING_HEADING),
         #                        transitions={'heading_approached': 'MOVE1'})
 
-        #smach.StateMachine.add('WAIT', MoveStraight(c, 10),
-                               #transitions={'timeout': 'EMERGE'})
+        # smach.StateMachine.add('WAIT', MoveStraight(c, 10),
+        # transitions={'timeout': 'EMERGE'})
 
-        #smach.StateMachine.add('EMERGE', Emerge(c),
-                               #transitions={'aborted': 'aborted'})
+        # smach.StateMachine.add('EMERGE', Emerge(c),
+        # transitions={'aborted': 'aborted'})
         smach.StateMachine.add('TELEOP', Teleop(c),
-                                transitions={'Switch_to_holding_depth': 'Switch_to_full_teleop'})
+                               transitions={'Switch_to_holding_depth': 'Switch_to_full_teleop'})
         smach.StateMachine.add('DEPTH_HOLDING', DepthHolding(c),
                                transitions={'Switch_to_full_teleop': 'Switch_to_holding_depth'})
-
 
     rospy.sleep(rospy.Duration(1))
     outcome = sm.execute()
