@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="type" default="simple" />
+
+
+
+
+  <node name="teleop" pkg="guppy" type="guppy_kbd_controller.py"  />
+  <node name="state_machine" pkg="guppy" type="state_mach.py"  />
+</launch>
